@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arduino Web Serial</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
+        #terminal { 
+            height: 300px; width: 100%; border: 1px solid #ccc; 
+            background: #1e1e1e; color: #00ff00; padding: 10px;
+            overflow-y: auto; font-family: monospace; white-space: pre-wrap;
+            margin-top: 10px; border-radius: 8px;
+        }
+        button { 
+            padding: 12px 24px; font-size: 16px; cursor: pointer;
+            background: #007bff; color: white; border: none; border-radius: 4px;
+        }
+        button:disabled { background: #ccc; }
+    </style>
+</head>
+<body>
+    <h2>Arduino Real-Time Monitor</h2>
+    <button id="connectBtn">Connect to Arduino</button>
+    <div id="terminal">Waiting for connection...</div>
+
+    <script>
+        const connectBtn = document.getElementById('connectBtn');
+        const terminal = document.getElementById('terminal');
+
+        connectBtn.addEventListener('click', async () => {
+            if (!("serial" in navigator)) {
+                alert("Web Serial API not supported. Use Chrome on Android.");
+                return;
+            }
+
+            try {
+                // 1. Request port and open connection
+                const port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+                
+                connectBtn.disabled = true;
+                terminal.innerText = "Connected!\n";
+
+                // 2. Setup text decoder for the incoming stream
+                const decoder = new TextDecoderStream();
+                const inputDone = port.readable.pipeTo(decoder.writable);
+                const reader = decoder.readable.getReader();
+
+                // 3. Read loop
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) {
+                        reader.releaseLock();
+                        break;
+                    }
+                    if (value) {
+                        terminal.innerText += value;
+                        // Auto-scroll to bottom
+                        terminal.scrollTop = terminal.scrollHeight;
+                    }
+                }
+            } catch (error) {
+                terminal.innerText += `\nError: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>
